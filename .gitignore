@@ -1,0 +1,6 @@
+# Matlab Mex Executables:
+*.mex*
+
+# Matlab coder data:
+codegen/
+

@@ -23,7 +23,15 @@ wCount = grid.w.nGrid;
 sBnd = [thBnd;wBnd];
 sN = [thCount;wCount];
 
-[weight, index] = barycentricWeights_mex(X,sBnd,sN);
-u = barycentricInterpolate_mex(A(P)',index,weight)';
+if exist('barycentricWeights_mex','file') == 3
+    [weight, index] = barycentricWeights_mex(X,sBnd,sN);
+else
+    [weight, index] = barycentricWeights(X,sBnd,sN);
+end
+if exist('barycentricInterpolate_mex','file') == 3
+    u = barycentricInterpolate_mex(A(P)',index,weight)';
+else
+    u = barycentricInterpolate(A(P)',index,weight)';
+end
 
 end

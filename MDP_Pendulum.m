@@ -4,7 +4,7 @@ function [V, P, S, A] = MDP_Pendulum(pendulum)
 % This function solves a MDP using value iteration
 %
 % INPUTS:
-%   pendulum = struct with information about pendulum model. 
+%   pendulum = struct with information about pendulum model.
 %
 % OUTPUTS:
 %   V = [nBinState x 1] = value function for each state (by index)
@@ -18,6 +18,17 @@ function [V, P, S, A] = MDP_Pendulum(pendulum)
 %   optimal action would be A(:,P(iState));
 %
 
+% Check for MEX File:
+if exist('barycentricInterpolate_mex','file') ~= 3
+    disp('Warning: ''barycentricInterpolate_mex'' not found');
+    disp('  --> switching to native Matlab version. This will decrease speed.')
+    disp('  --> Compile the MEX function by running the following command: ')
+    disp('      coder -build barycentricInterpolate.prj');
+    flagMex = false;
+else
+    flagMex = true;
+end
+
 % Build the MDP model of the pendulum (discretize problem)
 [S,A,Ti,Tw,R] = MDP_Build_Pendulum(pendulum);
 
@@ -28,21 +39,29 @@ V = zeros(nBinState,1);  %Value function
 P = zeros(nBinState,1);  %Policy
 VV = zeros(nBinState,nBinAction);  %Store temporary soln on each iteration
 
-% Set up the optimization: 
+% Set up the optimization:
 gamma = pendulum.opt.discount^(pendulum.dyn.timeStep/pendulum.dyn.timeConstant);
 tol = pendulum.opt.convergeTol;
 maxIter = pendulum.opt.maxIter;
 flagConverge = false;
 
-% VALUE ITERATION 
-for bigLoop = 1:maxIter   
-    for aI = 1:nBinAction   % loop over actions, searching for the best
-        VV(:,aI) = R(:,aI)...  %THIS IS THE KEY LINE
-            + gamma*barycentricInterpolate_mex(V,Ti(:,:,aI),Tw(:,:,aI));
-    end % aI  --  loop over actions
+% VALUE ITERATION
+for bigLoop = 1:maxIter
+    
+    if flagMex
+        for aI = 1:nBinAction   % loop over actions, searching for the best
+            VV(:,aI) = R(:,aI)...  %THIS IS THE KEY LINE
+                + gamma*barycentricInterpolate_mex(V,Ti(:,:,aI),Tw(:,:,aI));
+        end % aI  --  loop over actions
+    else
+        for aI = 1:nBinAction   % loop over actions, searching for the best
+            VV(:,aI) = R(:,aI)...  %THIS IS THE KEY LINE
+                + gamma*barycentricInterpolate(V,Ti(:,:,aI),Tw(:,:,aI));
+        end
+    end
     [Vnew,P] = min(VV,[],2);  %Select best action for each state
     
-    %Convergence stuff:  
+    %Convergence stuff:
     update = abs(Vnew-V);  %How much has the value function changed?
     V = Vnew;  % Copy the solution
     maxUpdate = max(update);
@@ -74,6 +93,18 @@ function [S,A,Ti,Tw,R] = MDP_Build_Pendulum(pendulum)
 %   R = [nBinState x nBinAction] = reward matrix
 %
 
+
+% Check for MEX File:
+if exist('barycentricWeights_mex','file') ~= 3
+    disp('Warning: ''barycentricWeights_mex'' not found');
+    disp('  --> switching to native Matlab version. This will decrease speed.')
+    disp('  --> Compile the MEX function by running the following command: ')
+    disp('      coder -build barycentricWeights.prj');
+    flagMex = false;
+else
+    flagMex = true;
+end
+
 % Information about the discretized grid:
 thBnd = pendulum.grid.th.bnd;
 thCount = pendulum.grid.th.nGrid;
@@ -82,7 +113,7 @@ wCount = pendulum.grid.w.nGrid;
 uBnd = pendulum.grid.u.bnd;
 uCount = pendulum.grid.u.nGrid;
 
-% Build finite set of states and actions 
+% Build finite set of states and actions
 [th, w] = ndgrid(...
     linspace(thBnd(1),thBnd(2),thCount),...
     linspace(wBnd(1),wBnd(2),wCount));
@@ -99,14 +130,18 @@ Ti = zeros(2+1,nBinState,nBinAction);  %Index
 dt = pendulum.dyn.timeStep;  %Time step for discretization
 for aI = 1:nBinAction
     tau = A(aI);  %Torque   (Zero-order-hold)
-    % 4th-order Runge-Kutta on dynamics 
+    % 4th-order Runge-Kutta on dynamics
     k1 = dynFun(S, tau, pendulum.dyn);
     k2 = dynFun(S + 0.5*dt*k1, tau, pendulum.dyn);
     k3 = dynFun(S + 0.5*dt*k2, tau, pendulum.dyn);
     k4 = dynFun(S + dt*k3, tau, pendulum.dyn);
     Snext = S + (dt/6)*(k1+2*k2+2*k3+k4);
-    %Barycentric Interpolation: 
-    [Tw(:,:,aI),Ti(:,:,aI)] = barycentricWeights_mex(Snext,sBnd,sN);
+    %Barycentric Interpolation:
+    if flagMex
+        [Tw(:,:,aI),Ti(:,:,aI)] = barycentricWeights_mex(Snext,sBnd,sN);
+    else
+        [Tw(:,:,aI),Ti(:,:,aI)] = barycentricWeights(Snext,sBnd,sN);
+    end
 end % aI  --  loop over actions
 
 %%%%% Build the reward (penalty) matrix:
