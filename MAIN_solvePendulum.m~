@@ -57,7 +57,7 @@ pendulum.opt.cost.boundry.width = 0.1;  %Boundry width (fraction)
 soln.th = S(1,:);
 soln.w = S(2,:);
 soln.u = A(P);
-soln.markerSize = 60*ones(size(soln.u));
+soln.markerSize = 50*ones(size(soln.u));
 
 figure(1); clf; colormap('jet')
 scatter3(soln.th, soln.w, soln.u, soln.markerSize, soln.u, 'filled');
@@ -75,7 +75,6 @@ ylabel('rate (rad/s)')
 zlabel('value ')
 title('Value Function')
 view(2)
-axis equal
 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~%
 %                        Run test simulations                             %
